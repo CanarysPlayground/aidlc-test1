@@ -57,8 +57,8 @@ def validate(data):
         end = date.fromisoformat(str(data.get("endDate")))
     except ValueError:
         return None, "startDate and endDate must be YYYY-MM-DD"
-    if end <= start:
-        return None, "endDate must be after startDate"
+    if end < start:
+        return None, "endDate cannot be before startDate"
     return {
         "title": title,
         "description": description,

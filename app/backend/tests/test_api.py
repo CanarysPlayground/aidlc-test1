@@ -154,6 +154,23 @@ def test_update_task(client, valid_task):
     assert client.get("/api/tasks/3").json["title"] == valid_task["title"]
 
 
+def test_update_same_day_task_is_allowed(client, valid_task):
+    valid_task["endDate"] = valid_task["startDate"]
+    res = client.put("/api/tasks/3", json=valid_task)
+    assert res.status_code == 200, res.json
+    task = client.get("/api/tasks/3").json
+    assert task["endDate"] == task["startDate"] == valid_task["startDate"]
+
+
+def test_update_task_with_end_before_start_returns_400(client, valid_task):
+    original = client.get("/api/tasks/3").json
+    valid_task["endDate"] = "2026-10-01"
+    res = client.put("/api/tasks/3", json=valid_task)
+    assert res.status_code == 400
+    assert res.json == {"error": "endDate cannot be before startDate"}
+    assert client.get("/api/tasks/3").json == original
+
+
 def test_update_missing_task_returns_404(client, valid_task):
     res = client.put("/api/tasks/999", json=valid_task)
     assert res.status_code == 404
