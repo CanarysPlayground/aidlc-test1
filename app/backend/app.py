@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import date
 from pathlib import Path
 from threading import Lock
@@ -86,7 +87,28 @@ def meta():
 
 @app.get("/api/tasks")
 def list_tasks():
-    return jsonify(sorted(tasks.values(), key=lambda t: t["id"]))
+    pagination = {}
+    for name, default in (("page", "1"), ("page_size", "10")):
+        value = request.args.get(name, default)
+        if not re.fullmatch(r"[+-]?[0-9]+", value):
+            return jsonify(error=f"{name} must be an integer"), 400
+        try:
+            pagination[name] = int(value)
+        except ValueError:
+            return jsonify(error=f"{name} must be an integer"), 400
+    page, page_size = pagination["page"], pagination["page_size"]
+    if page < 1:
+        return jsonify(error="page must be at least 1"), 400
+    if not 1 <= page_size <= 50:
+        return jsonify(error="page_size must be between 1 and 50"), 400
+    with lock:
+        total = len(tasks)
+        total_pages = (total + page_size - 1) // page_size
+        start = (page - 1) * page_size
+        ids = sorted(tasks)[start:start + page_size]
+        items = [tasks[task_id] for task_id in ids]
+    return jsonify(items=items, page=page, page_size=page_size,
+                   total=total, total_pages=total_pages)
 
 
 @app.get("/api/tasks/search")

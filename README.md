@@ -5,7 +5,8 @@ A lightweight task management application with a **Python (Flask) REST API** and
 ## Features
 
 - Create, view, update and delete tasks (CRUD)
-- Tasks displayed in a table with priority and area badges
+- Tasks displayed by ID ascending in a paginated table with priority and area badges
+- Server-side pagination with accessible Previous/Next controls and a live page indicator
 - In-app delete confirmation dialog
 - Server-side validation of all task fields
 - Interactive API documentation with Swagger UI
@@ -92,13 +93,64 @@ python app.py
 | Method | Endpoint               | Description                                  |
 |--------|------------------------|----------------------------------------------|
 | GET    | `/api/meta`            | Allowed values for assignees, areas, priority |
-| GET    | `/api/tasks`           | List all tasks                               |
+| GET    | `/api/tasks`           | List a page of tasks, sorted by ID ascending  |
 | GET    | `/api/tasks/{id}`      | Get a task by ID                             |
 | GET    | `/api/tasks/search?q=` | Search tasks by title                        |
 | GET    | `/api/reports?name=`   | Download a report file                       |
 | POST   | `/api/tasks`           | Create a task                                |
 | PUT    | `/api/tasks/{id}`      | Update a task                                |
 | DELETE | `/api/tasks/{id}`      | Delete a task                                |
+
+### Task pagination
+
+`GET /api/tasks` accepts optional query parameters:
+
+| Parameter | Default | Valid values |
+|-----------|---------|--------------|
+| `page` | `1` | Integer >= 1 |
+| `page_size` | `10` | Integer from 1 to 50 (inclusive) |
+
+The JSON response contains `items` (task objects for this page), `page` (requested page), `page_size` (requested page size), `total` (all tasks), and `total_pages` (total pages, rounded up). Pages beyond `total_pages` return empty `items` without changing the requested page. With no tasks, `items` is empty and `total_pages` is `0`.
+
+Example request and response, assuming one task exists:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:5000/api/tasks?page=1&page_size=10"
+```
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "title": "Prepare sprint demo",
+      "description": "Create slides and demo script.",
+      "assignedTo": "Priya",
+      "priority": 2,
+      "area": "Documentation",
+      "startDate": "2026-10-10",
+      "endDate": "2026-10-12"
+    }
+  ],
+  "page": 1,
+  "page_size": 10,
+  "total": 1,
+  "total_pages": 1
+}
+```
+
+Invalid pagination returns HTTP `400` with JSON:
+
+| Invalid input | Response |
+|---------------|----------|
+| Non-integer `page` (including empty values or decimals) | `{"error": "page must be an integer"}` |
+| Non-integer `page_size` (including empty values or decimals) | `{"error": "page_size must be an integer"}` |
+| `page < 1` | `{"error": "page must be at least 1"}` |
+| `page_size` outside 1-50 | `{"error": "page_size must be between 1 and 50"}` |
+
+The frontend fetches only the active page, using 10 tasks per page. Accessible **Previous** and **Next** buttons are disabled at the first and last page respectively, and both are disabled while loading or when no tasks exist. A live indicator shows `Page X of Y`, or `Page 0 of 0 (no tasks)`. If deletion removes the current last page, the frontend loads the last available page.
+
+### Create a task
 
 Example request:
 

@@ -48,12 +48,17 @@ def build_spec(assignees, areas, priorities):
             "/api/tasks": {
                 "get": {
                     "tags": ["Tasks"],
-                    "summary": "List all tasks",
+                    "summary": "List a page of tasks sorted by ID ascending",
+                    "description": "Pages beyond total_pages return empty items. No tasks yields total_pages 0.",
+                    "parameters": [
+                        {"name": "page", "in": "query", "schema": {
+                            "type": "integer", "minimum": 1, "default": 1}},
+                        {"name": "page_size", "in": "query", "schema": {
+                            "type": "integer", "minimum": 1, "maximum": 50, "default": 10}},
+                    ],
                     "responses": {
-                        "200": {
-                            "description": "List of tasks",
-                            "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Task"}}}},
-                        }
+                        "200": json_response("Page of tasks", "#/components/schemas/TaskPage"),
+                        "400": bad_request,
                     },
                 },
                 "post": {
@@ -113,6 +118,17 @@ def build_spec(assignees, areas, priorities):
             "schemas": {
                 "TaskInput": task_input,
                 "Task": task,
+                "TaskPage": {
+                    "type": "object",
+                    "required": ["items", "page", "page_size", "total", "total_pages"],
+                    "properties": {
+                        "items": {"type": "array", "items": {"$ref": "#/components/schemas/Task"}},
+                        "page": {"type": "integer", "minimum": 1},
+                        "page_size": {"type": "integer", "minimum": 1, "maximum": 50},
+                        "total": {"type": "integer", "minimum": 0},
+                        "total_pages": {"type": "integer", "minimum": 0},
+                    },
+                },
                 "Error": error,
                 "Meta": {
                     "type": "object",
