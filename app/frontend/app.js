@@ -7,6 +7,16 @@ const saveBtn = document.getElementById("saveBtn");
 const cancelBtn = document.getElementById("cancelBtn");
 const fields = ["title", "description", "assignedTo", "priority", "area", "startDate", "endDate"];
 const $ = (id) => document.getElementById(id);
+const pageSize = 10;
+let currentPage = 1;
+let totalPages = 0;
+let loadingTasks = false;
+let taskRequestId = 0;
+
+function updatePagination() {
+  $("previousBtn").disabled = loadingTasks || currentPage <= 1;
+  $("nextBtn").disabled = loadingTasks || currentPage >= totalPages;
+}
 
 function fillSelect(id, values) {
   const select = $(id);
@@ -44,8 +54,31 @@ function actionButton(label, className, onClick) {
   return btn;
 }
 
-async function loadTasks() {
-  const tasks = await request(API);
+async function loadTasks(page = currentPage) {
+  const requestId = ++taskRequestId;
+  loadingTasks = true;
+  updatePagination();
+  try {
+    const result = await request(`${API}?page=${page}&page_size=${pageSize}`);
+    if (requestId !== taskRequestId) return;
+    if (page > Math.max(1, result.total_pages)) {
+      return await loadTasks(Math.max(1, result.total_pages));
+    }
+    currentPage = result.page;
+    totalPages = result.total_pages;
+    $("pageIndicator").textContent = totalPages === 0
+      ? "Page 0 of 0 (no tasks)"
+      : `Page ${currentPage} of ${totalPages}`;
+    renderTasks(result.items);
+  } finally {
+    if (requestId === taskRequestId) {
+      loadingTasks = false;
+      updatePagination();
+    }
+  }
+}
+
+function renderTasks(tasks) {
   body.replaceChildren();
   tasks.forEach((t) => {
     const row = body.insertRow();
@@ -124,6 +157,18 @@ form.addEventListener("submit", async (e) => {
 });
 
 cancelBtn.addEventListener("click", resetForm);
+$("previousBtn").addEventListener("click", () => changePage(currentPage - 1));
+$("nextBtn").addEventListener("click", () => changePage(currentPage + 1));
+
+async function changePage(page) {
+  if (loadingTasks || page < 1 || page > totalPages) return;
+  try {
+    message.textContent = "";
+    await loadTasks(page);
+  } catch (e) {
+    message.textContent = e.message;
+  }
+}
 
 const user = new URLSearchParams(location.search).get("user");
 if (user) $("welcome").innerHTML = `Welcome back, <strong>${user}</strong>`;
